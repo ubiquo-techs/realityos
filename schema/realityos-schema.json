@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ubiquo-techs/realityos/main/schema/realityos-schema.json",
+  "title": "RealityOS Event Schema",
+  "description": "JSON Schema 2020-12 for all standard RealityOS events emitted by ubox nodes.",
+  "x-version": "1.1.0",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string" }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/presence" },
+    { "$ref": "#/$defs/navigate" },
+    { "$ref": "#/$defs/select" },
+    { "$ref": "#/$defs/gesture" },
+    { "$ref": "#/$defs/hand_active" },
+    { "$ref": "#/$defs/hand_state" },
+    { "$ref": "#/$defs/cursor" },
+    { "$ref": "#/$defs/body" },
+    { "$ref": "#/$defs/face" },
+    { "$ref": "#/$defs/lights_discovered" },
+    { "$ref": "#/$defs/lights_state" },
+    { "$ref": "#/$defs/op_stream_level" },
+    { "$ref": "#/$defs/midi" },
+    { "$ref": "#/$defs/custom" }
+  ],
+  "$defs": {
+    "presence": {
+      "description": "A person entered or left the interaction zone.",
+      "properties": {
+        "name": { "const": "realityos.presence" },
+        "type": { "type": "string", "enum": ["enter", "leave"] }
+      },
+      "required": ["name", "type"],
+      "additionalProperties": true
+    },
+    "navigate": {
+      "description": "Directional navigation intent.",
+      "properties": {
+        "name": { "const": "realityos.navigate" },
+        "direction": { "type": "string", "enum": ["left", "right", "up", "down"] }
+      },
+      "required": ["name", "direction"],
+      "additionalProperties": true
+    },
+    "select": {
+      "description": "Selection or confirmation action.",
+      "properties": {
+        "name": { "const": "realityos.select" },
+        "type": { "type": "string", "enum": ["grip", "release", "push", "pull"] }
+      },
+      "required": ["name", "type"],
+      "additionalProperties": true
+    },
+    "gesture": {
+      "description": "Named discrete gesture (e.g. zoom, kick, wave, point).",
+      "properties": {
+        "name": { "const": "realityos.gesture" },
+        "type": { "type": "string", "minLength": 1 }
+      },
+      "required": ["name", "type"],
+      "additionalProperties": true
+    },
+    "hand_active": {
+      "description": "Active tracking hand changed (left, right, or none).",
+      "properties": {
+        "name": { "const": "realityos.hand.active" },
+        "side": { "type": "string", "enum": ["left", "right", "none"] }
+      },
+      "required": ["name", "side"],
+      "additionalProperties": true
+    },
+    "hand_state": {
+      "description": "Hand open/closed state change.",
+      "properties": {
+        "name": { "const": "realityos.hand.state" },
+        "side": { "type": "string", "enum": ["left", "right"] },
+        "state": { "type": "string", "enum": ["open", "closed", "point"] }
+      },
+      "required": ["name", "side", "state"],
+      "additionalProperties": true
+    },
+    "cursor": {
+      "description": "Cursor position in normalized [0,1] x [0,1] space.",
+      "properties": {
+        "name": { "const": "realityos.cursor" },
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["name", "x", "y"],
+      "additionalProperties": true
+    },
+    "body": {
+      "description": "Full skeleton body frame.",
+      "properties": {
+        "name": { "const": "realityos.body" },
+        "skeletons": { "type": "array" }
+      },
+      "required": ["name", "skeletons"],
+      "additionalProperties": true
+    },
+    "face": {
+      "description": "Face tracking data for a single user.",
+      "properties": {
+        "name": { "const": "realityos.face" },
+        "user_id": { "type": "string" },
+        "yaw":   { "type": "number" },
+        "pitch": { "type": "number" },
+        "roll":  { "type": "number" }
+      },
+      "required": ["name", "user_id"],
+      "additionalProperties": true
+    },
+    "lights_discovered": {
+      "description": "Art-Net (or other) lighting devices discovered on the network.",
+      "properties": {
+        "name":    { "const": "realityos.lights.discovered" },
+        "node_id": { "type": "string" },
+        "devices": { "type": "array" }
+      },
+      "required": ["name", "node_id", "devices"],
+      "additionalProperties": true
+    },
+    "lights_state": {
+      "description": "Current state snapshot of all active lighting fixtures.",
+      "properties": {
+        "name":     { "const": "realityos.lights.state" },
+        "node_id":  { "type": "string" },
+        "fixtures": { "type": "array" }
+      },
+      "required": ["name", "node_id", "fixtures"],
+      "additionalProperties": true
+    },
+    "op_stream_level": {
+      "description": "Operational: controls how much high-frequency stream data is forwarded to xspace.",
+      "properties": {
+        "name":  { "const": "realityos.op.stream.level" },
+        "level": { "type": "string", "enum": ["none", "low", "medium", "high", "smart"] }
+      },
+      "required": ["name", "level"],
+      "additionalProperties": true
+    },
+    "midi": {
+      "description": "MIDI event under the realityos.midi.* namespace.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^realityos\\.midi\\..+"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": true
+    },
+    "custom": {
+      "description": "Developer-defined custom event under the realityos.custom.* namespace.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^realityos\\.custom\\..+"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": true
+    }
+  }
+}
