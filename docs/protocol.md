@@ -1,18 +1,12 @@
 # RealityOS — Node Wire Protocol
 
-This document describes how sensor and actuator nodes connect to the Ubox Physical Player hub and exchange messages.
+This document describes how sensor and actuator nodes connect to a RealityOS-compatible hub and exchange messages.
 
 ---
 
 ## Transport
 
-Nodes connect via WebSocket to:
-
-```
-ws://127.0.0.1:8181/KinectHtml5
-```
-
-All messages are JSON text frames.
+Nodes connect via WebSocket. All messages are JSON text frames.
 
 ---
 
@@ -42,12 +36,11 @@ Every message is wrapped in a hub envelope:
 
 | Type | Direction | When | Description |
 |------|-----------|------|-------------|
-| `node.register` | Node → Hub | On connect | Declares node identity, mode, and optional test page |
+| `node.register` | Node → Hub | On connect | Declares node identity, mode, and capabilities |
 | `node.event` | Node → Hub | On phygital event | RealityOS event payload |
-| `node.data` | Node → Hub | Continuous data | Legacy Arduino-wrapped data (LDR format) |
 | `node.heartbeat` | Node → Hub | Every 10 s | Keepalive with uptime |
 | `node.log` | Node → Hub | Operational | Human-readable log message |
-| `node.action` | App/REST → Hub → Node | To control actuators | Command routed to a named node |
+| `node.action` | App → Hub → Node | To control actuators | Command routed to a named node |
 
 ---
 
@@ -61,28 +54,26 @@ Sent immediately after the WebSocket connection is established.
   "level": 0,
   "timestamp": "2026-01-01T00:00:00Z",
   "payload": {
-    "node_id":   "lidar-01",
-    "node_type": "lidar",
+    "node_id":   "depth-node-name",
+    "node_type": "depth-camera",
     "mode":      "detector",
-    "version":   "1.2.0",
-    "test_page": "<html>...</html>"
+    "version":   "1.2.0"
   }
 }
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `node_id` | Yes | Unique identifier for this node instance |
-| `node_type` | Yes | Hardware type string (e.g. `"kinect2"`, `"lidar"`, `"dmx"`, `"midi"`) |
+| `node_id` | Yes | Unique identifier for this node instance — set by the user in configuration |
+| `node_type` | Yes | Hardware type string (e.g. `"depth-camera"`, `"lidar"`, `"dmx"`, `"midi"`) |
 | `mode` | Yes | `"detector"` \| `"actuator"` \| `"bidirectional"` |
-| `version` | Yes | Node binary version |
-| `test_page` | No | HTML string for the node test UI (served at `GET /node-test/{node_id}`) |
+| `version` | Yes | Node binary/software version |
 
 ---
 
 ## `node.event`
 
-Carries a RealityOS event payload. The `payload` is a flat JSON object; `name` identifies the event.
+Carries a RealityOS event payload. The `payload.data` field is a flat JSON object; `name` identifies the event.
 
 ```json
 {
@@ -90,8 +81,8 @@ Carries a RealityOS event payload. The `payload` is a flat JSON object; `name` i
   "level": 1,
   "timestamp": "2026-01-01T00:00:00Z",
   "payload": {
-    "node_id":   "kinect2-01",
-    "node_type": "kinect2",
+    "node_id":   "depth-node-name",
+    "node_type": "depth-camera",
     "data": {
       "name": "realityos.presence",
       "type": "enter",
@@ -100,33 +91,6 @@ Carries a RealityOS event payload. The `payload` is a flat JSON object; `name` i
   }
 }
 ```
-
-The hub extracts `payload.data`, validates it against the RealityOS schema, and forwards it to browser apps.
-
----
-
-## `node.data`
-
-Legacy format — used by the LiDAR node for backward compatibility with apps that read `msgFromArduino()`.
-
-```json
-{
-  "type": "node.data",
-  "level": 1,
-  "timestamp": "2026-01-01T00:00:00Z",
-  "payload": {
-    "node_id": "lidar-01",
-    "data": {
-      "name":  "LDR",
-      "value": "LDR X: 312.1, Y: 205.5"
-    }
-  }
-}
-```
-
-The hub Arduino-wraps `payload.data` before forwarding to KindApp clients.
-
-New nodes should use `node.event` instead.
 
 ---
 
@@ -138,14 +102,14 @@ New nodes should use `node.event` instead.
   "level": 3,
   "timestamp": "2026-01-01T00:00:00Z",
   "payload": {
-    "node_id":  "lidar-01",
+    "node_id":  "depth-node-name",
     "pid":      12345,
     "uptime_s": 120
   }
 }
 ```
 
-Sent every 10 seconds. Dashboard uses this to show node uptime.
+Sent every 10 seconds. The hub uses this to monitor node health.
 
 ---
 
@@ -157,54 +121,31 @@ Sent every 10 seconds. Dashboard uses this to show node uptime.
   "level": 2,
   "timestamp": "2026-01-01T00:00:00Z",
   "payload": {
-    "node_id": "lidar-01",
-    "message": "serial port COM5 opened successfully"
+    "node_id": "depth-node-name",
+    "message": "device opened successfully"
   }
 }
 ```
-
-Forwarded to the dashboard only — not to browser apps.
 
 ---
 
 ## `node.action`
 
-Sent by browser apps (or REST) to control an actuator node. The hub routes the envelope directly to the WebSocket connection registered under `node_id`.
+Sent by apps to control an actuator node. The hub routes the envelope directly to the node registered under `node_id`.
 
 ```json
 {
   "type": "node.action",
   "payload": {
-    "node_id": "dmx-01",
+    "node_id": "lights-node-name",
     "command": "lights.set",
     "data": {
-      "fixture_id": "par-01",
+      "fixture_id": "fixture-name",
       "channels": { "dim": 200, "red": 255, "green": 0, "blue": 0 }
     }
   }
 }
 ```
-
-**REST alternative** — `POST http://127.0.0.1:8080/api/node/action` with `payload` as the request body:
-
-```json
-{ "node_id": "dmx-01", "command": "lights.blackout", "data": {} }
-```
-
-Response: `200 {"ok":true}` or `503 {"error":"node not connected"}`.
-
----
-
-## Hub Routing Table
-
-| Message type | KindApp clients (`/KinectHtml5`) | KindDashboard (`/ws/dashboard`) | Target node |
-|---|---|---|---|
-| `node.event` | ✓ payload forwarded (translated to RealityOS if needed) | ✓ full envelope | — |
-| `node.data` | ✓ Arduino-wrapped | ✓ full envelope | — |
-| `node.action` | — | ✓ full envelope | ✓ routed by `node_id` |
-| `node.heartbeat` | — | ✓ full envelope | — |
-| `node.log` | — | ✓ full envelope | — |
-| `node.register` | — | ✓ + registry update | — |
 
 ---
 
@@ -212,14 +153,6 @@ Response: `200 {"ok":true}` or `503 {"error":"node not connected"}`.
 
 Nodes must reconnect automatically after any WebSocket error:
 
-- **WebSocket disconnect**: reconnect after 3 s
-- **Serial/hardware error**: reconnect after 2 s
+- **WebSocket disconnect**: reconnect after ~3 s
+- **Hardware error**: reconnect hardware after ~2 s, then WebSocket if needed
 - On reconnect: re-send `node.register` immediately
-
----
-
-## Legacy Name Translation
-
-The hub translates Kinect v2 event names to canonical RealityOS names automatically. Both the original name and the translated name are forwarded so legacy apps keep working.
-
-See [events.md](events.md) for the full translation table.

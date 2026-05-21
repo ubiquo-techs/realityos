@@ -1,15 +1,12 @@
 # RealityOS — App Developer Reference
 
-> **Source of truth**: `docs/realityos-protocol.md` (protocol spec) and `core/dashboard/uboxclient.js` (browser API).
-> Update this file whenever either changes.
+Build phygital browser experiences using the RealityOS event protocol. The reference implementation is [Ubox](https://ubox.world).
 
 ---
 
 ## Overview
 
-RealityOS is the phygital event layer. Sensors (Kinect, LiDAR, MIDI keyboard, button, …) publish structured events to the local hub. Your browser app subscribes through `uboxclient.js`. Actuators (DMX lights) receive commands the same way — through the hub — via `node.action` messages.
-
-All events arrive as JSON over WebSocket. `uboxclient.js` parses and dispatches them so you only deal with plain JavaScript callbacks.
+Sensor nodes publish structured RealityOS events to a local hub. Your browser app subscribes through `uboxclient.js` and reacts to physical events — presence, movement, gestures, MIDI, lights — with plain JavaScript callbacks.
 
 ---
 
@@ -18,13 +15,12 @@ All events arrive as JSON over WebSocket. `uboxclient.js` parses and dispatches 
 ```html
 <!DOCTYPE html>
 <html>
-<head><title>My Ubox App</title></head>
+<head><title>My Experience</title></head>
 <body>
 
-<!-- 1. Load ubox bridge (served by the player at this exact URL) -->
+<!-- Load the RealityOS browser client -->
 <script src="http://127.0.0.1:8080/uboxclient.js"></script>
 
-<!-- 2. Your app logic -->
 <script>
   ubox.onPresence(function (type, userId) {
     if (type === 'enter') document.body.style.background = '#111';
@@ -39,7 +35,7 @@ All events arrive as JSON over WebSocket. `uboxclient.js` parses and dispatches 
 </html>
 ```
 
-`uboxclient.js` auto-connects to `ws://127.0.0.1:8181/KinectHtml5` on load. No manual setup needed.
+`uboxclient.js` auto-connects to the local hub on load. No manual setup needed.
 
 ---
 
@@ -56,8 +52,6 @@ ubox.onPresence(function (type, userId) {
 });
 ```
 
-**Sources**: Kinect v2 (skeleton tracking), LiDAR (cluster detection).
-
 **Wire payload**:
 ```json
 { "name": "realityos.presence", "type": "enter", "user_id": "u1" }
@@ -67,13 +61,12 @@ ubox.onPresence(function (type, userId) {
 
 ### Navigate — `ubox.onNavigate(fn)`
 
-Directional intent — swipe, sweep, kick direction.
+Directional intent — swipe, sweep, step direction.
 
 ```js
 ubox.onNavigate(function (direction, hand, userId) {
   // direction: 'left' | 'right' | 'up' | 'down'
   // hand: 'right' | 'left'
-  // userId: string | undefined
   if (direction === 'right') showNextSlide();
   if (direction === 'left')  showPrevSlide();
 });
@@ -88,7 +81,7 @@ ubox.onNavigate(function (direction, hand, userId) {
 
 ### Select — `ubox.onSelect(fn)`
 
-Physical confirmation of intent — grip, push, pull (phygital click).
+Physical confirmation of intent — grip, push, pull.
 
 ```js
 ubox.onSelect(function (type, hand, userId) {
@@ -111,50 +104,32 @@ Named physical gesture with additional context.
 ```js
 ubox.onGesture(function (type, data, userId) {
   // type: 'zoom' | 'kick' | 'jump' | 'lean' | 'wave' | 'point'
-  // data: full event payload (type-specific fields below)
   switch (type) {
-    case 'zoom':  handleZoom(data.direction);         break; // direction: 'in'|'out'
-    case 'kick':  handleKick(data.side, data.angle);  break; // side: 'left'|'right', angle: degrees, distance: mm
-    case 'jump':  handleJump(data.intensity);         break; // intensity: 0–100
-    case 'lean':  handleLean(data.x, data.y);         break; // x/y: -1.0..1.0
-    case 'wave':  handleWave(data.side);              break; // side: 'left'|'right'
-    case 'point': handlePoint(data.side);             break; // side: 'left'|'right'
+    case 'zoom':  handleZoom(data.direction);        break; // direction: 'in'|'out'
+    case 'kick':  handleKick(data.side, data.angle); break; // side: 'left'|'right', angle: degrees, distance: mm
+    case 'jump':  handleJump(data.intensity);        break; // intensity: 0–100
+    case 'lean':  handleLean(data.x, data.y);        break; // x/y: -1.0..1.0
+    case 'wave':  handleWave(data.side);             break; // side: 'left'|'right'
+    case 'point': handlePoint(data.side);            break; // side: 'left'|'right'
   }
 });
-```
-
-**Wire payloads**:
-```json
-{ "name": "realityos.gesture", "type": "zoom",  "direction": "in" }
-{ "name": "realityos.gesture", "type": "kick",  "side": "left", "angle": 45.2, "distance": 312.0 }
-{ "name": "realityos.gesture", "type": "jump",  "intensity": 85.0 }
-{ "name": "realityos.gesture", "type": "lean",  "x": -0.3, "y": 0.1 }
-{ "name": "realityos.gesture", "type": "wave",  "side": "right" }
-{ "name": "realityos.gesture", "type": "point", "side": "right" }
 ```
 
 ---
 
 ### Cursor — `ubox.onCursor(fn)`
 
-Continuous position stream. `x`/`y` are normalized `0.0–1.0` regardless of sensor type.
+Continuous position stream. `x`/`y` normalized `0.0–1.0` regardless of sensor type.
 
 ```js
 ubox.onCursor(function (x, y, userId) {
   // x: 0.0 (left) – 1.0 (right)
-  // y: 0.0 (top/far) – 1.0 (bottom/near)  ← axis varies by sensor
+  // y: 0.0 (top/far) – 1.0 (bottom/near)
   moveCursor(x * window.innerWidth, y * window.innerHeight);
 });
 ```
 
-> **Stream level**: cursor is high-frequency. By default it is not forwarded to xspace. Call `ubox.setStreamLevel('medium')` to enable cloud forwarding.
-
-**Sources**: Kinect v2 (active hand → cursor), LiDAR (cluster centroid).
-
-**Wire payload**:
-```json
-{ "name": "realityos.cursor", "x": 0.52, "y": 0.31, "user_id": "u1" }
-```
+> **Stream level**: high-frequency. Not forwarded to the cloud by default. Call `ubox.setStreamLevel('medium')` to enable.
 
 ---
 
@@ -164,7 +139,6 @@ Full skeleton data per frame.
 
 ```js
 ubox.onBody(function (skeletons) {
-  // skeletons: array of skeleton objects
   skeletons.forEach(function (sk) {
     var handR = sk.joints.find(j => j.name === 'hand_right');
     if (handR && handR.state === 'tracked') {
@@ -183,8 +157,6 @@ ubox.onBody(function (skeletons) {
   ],
   "hand_right": "open",
   "hand_left": "closed",
-  "right_hand_raised": 0,
-  "left_hand_raised": 0,
   "depth_mm": 1450
 }
 ```
@@ -227,8 +199,6 @@ ubox.onFace(function (data) {
 
 ### Hand Active — `ubox.onHandActive(fn)`
 
-Which hand is currently the controlling hand.
-
 ```js
 ubox.onHandActive(function (side, userId) {
   // side: 'right' | 'left' | 'none'
@@ -239,8 +209,6 @@ ubox.onHandActive(function (side, userId) {
 ---
 
 ### Hand State — `ubox.onHandState(fn)`
-
-Open/closed/pointing state of a specific hand.
 
 ```js
 ubox.onHandState(function (side, state, userId) {
@@ -269,7 +237,6 @@ ubox.onMidi(function (event) {
       break;
 
     case 'realityos.midi.note_off':
-      // event.channel, event.note, event.velocity (0), event.note_name, event.device
       releaseNote(event.note);
       break;
 
@@ -285,7 +252,7 @@ ubox.onMidi(function (event) {
 
     case 'realityos.midi.pitch_bend':
       // event.channel, event.value (-8192..8191, 0 = center), event.device
-      setPitchBend(event.value / 8192); // normalize to -1..1
+      setPitchBend(event.value / 8192);
       break;
 
     case 'realityos.midi.device_list':
@@ -296,115 +263,62 @@ ubox.onMidi(function (event) {
 });
 ```
 
-**Wire payloads**:
-```json
-{ "name": "realityos.midi.note_on",       "channel": 1, "note": 60, "velocity": 100, "note_name": "C4",  "device": "KeyLab 61" }
-{ "name": "realityos.midi.note_off",       "channel": 1, "note": 60, "velocity": 0,   "note_name": "C4",  "device": "KeyLab 61" }
-{ "name": "realityos.midi.control_change", "channel": 1, "control": 64, "value": 127, "device": "KeyLab 61" }
-{ "name": "realityos.midi.program_change", "channel": 1, "program": 5,               "device": "KeyLab 61" }
-{ "name": "realityos.midi.pitch_bend",     "channel": 1, "value": 8192,              "device": "KeyLab 61" }
-{ "name": "realityos.midi.device_list",    "devices": [{ "index": 0, "name": "KeyLab 61" }] }
-```
-
-> **Note**: velocity-0 NoteOn messages are normalized to `note_off` by the MIDI node automatically.
-
 ### MIDI Node Actions
 
 ```js
 // Switch MIDI input device without restarting the node
-ubox.sendNodeAction('midi-01', 'set_device', { index: 1 });
+ubox.sendNodeAction('midi-node-name', 'set_device', { index: 1 });
 
-// Re-emit device list (triggers realityos.midi.device_list event)
-ubox.sendNodeAction('midi-01', 'list_devices', {});
+// Re-emit device list
+ubox.sendNodeAction('midi-node-name', 'list_devices', {});
 ```
 
 ---
 
 ## Lights Namespace (`realityos.lights.*`)
 
-The DMX node (`dmx-01`) bridges Art-Net/DMX512 hardware. It is an **actuator**: your app sends commands, the node drives the physical lights.
+A lights actuator node bridges Art-Net/DMX512 hardware. Your app sends commands, the node drives the physical lights.
 
 ### Events (Node → App)
-
-#### `ubox.onDMXDiscovered(fn)` — hardware scan result
 
 ```js
 ubox.onDMXDiscovered(function (event) {
   // event.node_id, event.target_ip, event.devices: [{ip, short_name, long_name, mac, num_ports, out_universes}]
   event.devices.forEach(d => console.log('found', d.short_name, 'at', d.ip));
 });
-```
 
-#### `ubox.onDMXState(fn)` — fixture channel state
-
-```js
 ubox.onDMXState(function (event) {
   // event.node_id, event.target_ip, event.fixtures: [{id, type, address, channels}]
-  event.fixtures.forEach(f => {
-    console.log(f.id, 'dim:', f.channels.dim, 'rgb:', f.channels.red, f.channels.green, f.channels.blue);
-  });
+  event.fixtures.forEach(f => console.log(f.id, 'dim:', f.channels.dim));
 });
 ```
-
-Emitted every 10 s and immediately after any fixture list change.
-
----
 
 ### Actions (App → Node)
 
-All sent via `ubox.sendNodeAction(nodeId, command, data)`.
-
 ```js
-// Scan for Art-Net hardware on the network
-ubox.sendNodeAction('dmx-01', 'lights.discover', {});
-
-// Point the node at a specific Art-Net device
-ubox.sendNodeAction('dmx-01', 'lights.set_target', { ip: '2.0.0.100' });
-
-// Set individual fixture channels
-ubox.sendNodeAction('dmx-01', 'lights.set', {
-  fixture_id: 'par-01',
+ubox.sendNodeAction('lights-node-name', 'lights.discover', {});
+ubox.sendNodeAction('lights-node-name', 'lights.set_target', { ip: '2.0.0.100' });
+ubox.sendNodeAction('lights-node-name', 'lights.set', {
+  fixture_id: 'fixture-name',
   channels: { dim: 200, red: 255, green: 0, blue: 0, white: 0, strobe: 0 }
 });
-
-// Apply a named preset
-ubox.sendNodeAction('dmx-01', 'lights.preset', { fixture_id: 'par-01', preset: 'red' });
-// presets: 'full_white' | 'red' | 'green' | 'blue' | 'blackout'
-
-// Black out all fixtures
-ubox.sendNodeAction('dmx-01', 'lights.blackout', {});
-
-// Set a single DMX channel by address
-ubox.sendNodeAction('dmx-01', 'lights.set_raw', { address: 3, value: 128 });
-
-// Manage fixtures at runtime
-ubox.sendNodeAction('dmx-01', 'lights.add_fixture',     { id: 'par-01', type: 'led-par-6ch', address: 1 });
-ubox.sendNodeAction('dmx-01', 'lights.remove_fixture',  { fixture_id: 'par-01' });
-ubox.sendNodeAction('dmx-01', 'lights.clear_fixtures',  {});
+ubox.sendNodeAction('lights-node-name', 'lights.preset',  { fixture_id: 'fixture-name', preset: 'red' });
+ubox.sendNodeAction('lights-node-name', 'lights.blackout', {});
+ubox.sendNodeAction('lights-node-name', 'lights.set_raw',  { address: 3, value: 128 });
+ubox.sendNodeAction('lights-node-name', 'lights.add_fixture',    { id: 'fixture-name', type: 'led-par-6ch', address: 1 });
+ubox.sendNodeAction('lights-node-name', 'lights.remove_fixture', { fixture_id: 'fixture-name' });
+ubox.sendNodeAction('lights-node-name', 'lights.clear_fixtures', {});
 ```
 
-### Fixture Types
+**Presets**: `full_white` · `red` · `green` · `blue` · `blackout`
 
-| Type | Channels | Layout |
-|------|----------|--------|
+| Fixture type | Channels | Layout |
+|---|---|---|
 | `led-par-6ch` | 6 | DIM · R · G · B · W · STROBE |
 | `pixel-bar-4ch` | 4 | R · G · B · W |
 | `pixel-bar-8ch` | 8 | DIM · R · G · B · W · STROBE · PROG · SPEED |
 | `pixel-bar-96ch` | 96 | 24 pixels × (R · G · B · W) |
 | `pixel-bar-100ch` | 100 | DIM · STROBE · PROG · SPEED + 24 × (R · G · B · W) |
-
-### REST Alternative
-
-Node actions can also be sent over HTTP (useful for server-side tooling or dashboards):
-
-```
-POST http://127.0.0.1:8080/api/node/action
-Content-Type: application/json
-
-{ "node_id": "dmx-01", "command": "lights.blackout", "data": {} }
-```
-
-Response: `200 {"ok":true}` or `503 {"error":"node not connected"}`.
 
 ---
 
@@ -413,20 +327,14 @@ Response: `200 {"ok":true}` or `503 {"error":"node not connected"}`.
 Bidirectional developer-defined events with free-form JSON.
 
 ```js
-// Listen for custom events coming from xspace or other apps
 ubox.onCustom(function (event) {
-  // event.name = 'realityos.custom.<something>'
   if (event.name === 'realityos.custom.score_updated') {
     updateScoreDisplay(event.points);
   }
 });
 
-// Send a custom event to xspace
 ubox.sendCustom('score_updated', { points: 150, player: 'p1' });
 // → sends: { name: 'realityos.custom.score_updated', points: 150, player: 'p1' }
-
-// You can also pass the full name
-ubox.sendCustom('realityos.custom.zone_trigger', { zone: 'A', active: true });
 ```
 
 ---
@@ -435,34 +343,34 @@ ubox.sendCustom('realityos.custom.zone_trigger', { zone: 'A', active: true });
 
 ### Stream Level
 
-Cursor, body, and face are high-frequency streams. By default they are **not forwarded to xspace** (cloud). Control this with stream level:
+Cursor, body, and face are high-frequency streams. Control cloud forwarding:
 
 ```js
-ubox.setStreamLevel('medium'); // shorthand
-
-// Or send the full op event
+ubox.setStreamLevel('medium');
+// or
 ubox.sendOp('realityos.op.stream.level', { level: 'high' });
 ```
 
-| Level | Cursor | Body | Face |
-|-------|--------|------|------|
-| `none` (default) | ✗ | ✗ | ✗ |
-| `low` | Every 10th frame | Every 10th frame | Every 10th frame |
-| `medium` | Every 5th frame | Every 5th frame | Every 5th frame |
-| `high` | Every frame | Every frame | Every frame |
-| `smart` | Adaptive (≈ medium) | Adaptive | Adaptive |
+| Level | Forwarding |
+|-------|-----------|
+| `none` (default) | Off |
+| `low` | Every 10th frame |
+| `medium` | Every 5th frame |
+| `high` | Every frame |
+| `smart` | Adaptive (≈ medium) |
 
-Interaction events (`navigate`, `select`, `presence`, `gesture`, `hand.*`) are **always forwarded** regardless of stream level.
+Interaction events are always forwarded regardless of stream level.
 
 ---
 
-## `ubox.onStandard(fn)` — Incoming Standard Events from Xspace
+## Incoming Events from the Cloud
 
-Standard `realityos.*` events forwarded from the cloud (another player or server-side logic) arrive here:
+Standard events forwarded from the cloud backend arrive on `ubox.onStandard`. Custom events arrive on `ubox.onCustom`.
 
 ```js
 ubox.onStandard(function (data) {
-  console.log('standard from xspace', data);
+  var event = JSON.parse(data);
+  console.log('from cloud', event);
 });
 ```
 
@@ -483,74 +391,35 @@ ubox.onHandActive(fn)  // fn(side, userId)            side: 'right'|'left'|'none
 ubox.onHandState(fn)   // fn(side, state, userId)     state: 'open'|'closed'|'point'
 
 // ── MIDI ──────────────────────────────────────────────────────────────────
-ubox.onMidi(fn)        // fn(event)  event.name = 'realityos.midi.*'
+ubox.onMidi(fn)          // fn(event)  event.name = 'realityos.midi.*'
 
 // ── Lights / DMX ──────────────────────────────────────────────────────────
 ubox.onDMXDiscovered(fn) // fn(event) — hardware scan result
 ubox.onDMXState(fn)      // fn(event) — fixture channel state
 
-// ── Custom / Standard from xspace ─────────────────────────────────────────
-ubox.onCustom(fn)      // fn(event) — realityos.custom.*
-ubox.onStandard(fn)    // fn(data)  — realityos.* forwarded from xspace
+// ── Cloud events ──────────────────────────────────────────────────────────
+ubox.onCustom(fn)        // fn(event) — realityos.custom.* (bidirectional)
+ubox.onStandard(fn)      // fn(data)  — realityos.* forwarded from cloud
 
 // ── Operational ───────────────────────────────────────────────────────────
-ubox.setStreamLevel(level)        // 'none'|'low'|'medium'|'high'|'smart'
-ubox.sendOp(name, payload)        // send any realityos.op.* event
+ubox.setStreamLevel(level)         // 'none'|'low'|'medium'|'high'|'smart'
+ubox.sendOp(name, payload)         // send any realityos.op.* event
 
 // ── Outbound ──────────────────────────────────────────────────────────────
-ubox.sendCustom(name, payload)             // send realityos.custom.* to xspace
-ubox.sendNodeAction(nodeId, cmd, data)     // route node.action to an actuator node
-
-// ── Legacy (backward compat — avoid in new apps) ─────────────────────────
-ubox.onArduino(fn)     // fn(value) — raw Arduino-wrapped messages
-ubox.onZoom(fn)        // fn(state, delta, distance) — legacy zoom stream
-sendToArduino(msg)     // global; sends raw string via WebSocket
+ubox.sendCustom(name, payload)     // send realityos.custom.* to cloud
+ubox.sendNodeAction(nodeId, cmd, data)  // route node.action to an actuator node
 ```
 
 ---
 
-## Kinect Legacy → RealityOS Translation
-
-The hub translates Kinect-specific event names automatically. New apps receive the canonical name; old apps continue to receive both.
-
-| Kinect name | Canonical event | Notes |
-|-------------|----------------|-------|
-| `RIGHT` | `realityos.navigate` | direction=right, hand=right |
-| `LEFT` | `realityos.navigate` | direction=left, hand=right |
-| `LRIGHT` | `realityos.navigate` | direction=right, hand=left |
-| `RLEFT` | `realityos.navigate` | direction=left, hand=left |
-| `GRIP` | `realityos.select` | type=grip |
-| `RELEASE` | `realityos.select` | type=release |
-| `CLICKDOWN` | `realityos.select` | type=push |
-| `CLICKUP` | `realityos.select` | type=pull |
-| `ZOOM_IN` | `realityos.gesture` | type=zoom, direction=in |
-| `ZOOM_OUT` | `realityos.gesture` | type=zoom, direction=out |
-| `POINT` | `realityos.gesture` | type=point, side=right |
-| `Wave` | `realityos.gesture` | type=wave, side=right |
-| `Kick` | `realityos.gesture` | type=kick (angle, side, distance passed through) |
-| `Jump` | `realityos.gesture` | type=jump (intensity passed through) |
-| `Lean` | `realityos.gesture` | type=lean (x, y passed through) |
-| `NewUser` | `realityos.presence` | type=enter |
-| `NoUser` / `UserLeft` | `realityos.presence` | type=leave |
-| `ChangedHandRight` | `realityos.hand.active` | side=right |
-| `ChangedHandLeft` | `realityos.hand.active` | side=left |
-| `ChangedHandNone` | `realityos.hand.active` | side=none |
-| `active_hand` | `realityos.cursor` | x/y passed through |
-| `skeleton` | `realityos.body` | skeletons passed through |
-| `face` | `realityos.face` | all fields passed through |
-
----
-
 ## Full App Example
-
-A minimal interactive experience responding to presence, navigation, gestures, and MIDI:
 
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>My Ubox Experience</title>
+  <title>My RealityOS Experience</title>
   <style>
     body { margin: 0; background: #000; color: #fff; font-family: sans-serif;
            display: flex; align-items: center; justify-content: center;
@@ -577,30 +446,23 @@ A minimal interactive experience responding to presence, navigation, gestures, a
       show._t = setTimeout(function () { msg.classList.remove('visible'); }, 2000);
     }
 
-    // ── Presence ─────────────────────────────────────────────────────────
     ubox.onPresence(function (type) {
       if (type === 'enter') show('Hello!');
       if (type === 'leave') show('Goodbye');
     });
 
-    // ── Navigation ───────────────────────────────────────────────────────
-    ubox.onNavigate(function (direction) {
-      show('→ ' + direction);
-    });
+    ubox.onNavigate(function (direction) { show('→ ' + direction); });
 
-    // ── Select ───────────────────────────────────────────────────────────
     ubox.onSelect(function (type) {
       if (type === 'grip') show('Selected!');
     });
 
-    // ── Cursor ───────────────────────────────────────────────────────────
     ubox.onCursor(function (x, y) {
       cursor.style.display = 'block';
       cursor.style.left = (x * 100) + 'vw';
       cursor.style.top  = (y * 100) + 'vh';
     });
 
-    // ── MIDI ─────────────────────────────────────────────────────────────
     ubox.onMidi(function (event) {
       if (event.name === 'realityos.midi.note_on') {
         show(event.note_name + ' vel:' + event.velocity);
@@ -611,61 +473,11 @@ A minimal interactive experience responding to presence, navigation, gestures, a
       }
     });
 
-    // ── Lights — react to presence with DMX ──────────────────────────────
     ubox.onPresence(function (type) {
-      if (type === 'enter') {
-        ubox.sendNodeAction('dmx-01', 'lights.preset', { fixture_id: 'par-01', preset: 'full_white' });
-      }
-      if (type === 'leave') {
-        ubox.sendNodeAction('dmx-01', 'lights.blackout', {});
-      }
+      if (type === 'enter') ubox.sendNodeAction('lights-node-name', 'lights.preset', { fixture_id: 'fixture-name', preset: 'full_white' });
+      if (type === 'leave') ubox.sendNodeAction('lights-node-name', 'lights.blackout', {});
     });
   </script>
 </body>
 </html>
 ```
-
----
-
-## Configuration Reference
-
-Nodes are declared in `config.yaml` (installed: `%LOCALAPPDATA%\Ubox Physical Player\config.yaml`).
-
-```yaml
-nodes:
-  - id: midi-01
-    runtime: native
-    mode: detector
-    script: midi-sensor.exe
-    manifest_url: "https://raw.githubusercontent.com/ubiquo-techs/ubox-distribution/main/manifests/sensors/midi/manifest.json"
-    args: ["--device-index", "0"]
-    enabled: true
-
-  - id: dmx-01
-    runtime: native
-    mode: actuator
-    script: dmx-sensor.exe
-    manifest_url: "https://raw.githubusercontent.com/ubiquo-techs/ubox-distribution/main/manifests/sensors/dmx/manifest.json"
-    args: ["--universe", "0", "--local-ip", "2.0.0.2", "--hz", "25", "--fixtures", "fixtures.json"]
-    enabled: true
-
-  - id: lidar-01
-    runtime: native
-    mode: detector
-    script: lidar-sensor.exe
-    manifest_url: "https://raw.githubusercontent.com/ubiquo-techs/ubox-distribution/main/manifests/sensors/lidar/manifest.json"
-    args: ["--port", "COM5", "--baud", "460800"]
-    enabled: true
-```
-
----
-
-## Updating This Document
-
-When the RealityOS protocol changes:
-
-1. Update `docs/realityos-protocol.md` with the protocol-level spec.
-2. Update `core/dashboard/uboxclient.js` with the new browser API.
-3. Update this file to reflect the new events, callbacks, or actions.
-
-This file is the entry point for agents and developers building Ubox experiences. Keep all three files in sync.

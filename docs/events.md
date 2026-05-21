@@ -20,13 +20,11 @@ Fired when a person enters or leaves the phygital interaction zone.
 | `type` | Yes | `"enter"` \| `"leave"` |
 | `user_id` | No | String identifier for multi-user tracking |
 
-**Sources**: Kinect v2 (skeleton enter/leave), LiDAR (cluster detection timeout).
-
 ---
 
 ### `realityos.navigate`
 
-Directional intent expressed physically — swipe, sweep, kick direction.
+Directional intent expressed physically — swipe, sweep, step direction.
 
 ```json
 { "name": "realityos.navigate", "direction": "right", "hand": "right", "user_id": "u1" }
@@ -42,7 +40,7 @@ Directional intent expressed physically — swipe, sweep, kick direction.
 
 ### `realityos.select`
 
-Physical confirmation of intent — the phygital equivalent of a mouse click.
+Physical confirmation of intent — the phygital equivalent of a click.
 
 ```json
 { "name": "realityos.select", "type": "grip",    "hand": "right", "user_id": "u1" }
@@ -134,9 +132,7 @@ Continuous position. `x`/`y` are normalized `0.0–1.0` regardless of sensor typ
 | `y` | Yes | 0.0 (top/far) – 1.0 (bottom/near) |
 | `user_id` | No | String |
 
-> **High-frequency.** Xspace forwarding is gated by `realityos.op.stream.level` (default: `none`).
-
-**Sources**: Kinect v2 (active hand position normalized from 640×480), LiDAR (cluster centroid normalized from configured zone).
+> **High-frequency.** Cloud forwarding is gated by `realityos.op.stream.level` (default: `none`).
 
 ---
 
@@ -196,7 +192,7 @@ Face tracking data for a single user.
 
 ## Lights Namespace (`realityos.lights.*`)
 
-The DMX node bridges Art-Net/DMX512 hardware. It is an **actuator**: apps send `node.action` commands (see Actions section), and the node emits the following events back.
+An actuator node bridges Art-Net/DMX512 hardware. Apps send `node.action` commands; the node emits the following events back.
 
 ### `realityos.lights.discovered`
 
@@ -205,13 +201,13 @@ Emitted after every Art-Net scan.
 ```json
 {
   "name":      "realityos.lights.discovered",
-  "node_id":   "dmx-01",
+  "node_id":   "lights-node-name",
   "target_ip": "2.0.0.100",
   "devices": [
     {
       "ip":            "2.0.0.100",
-      "short_name":    "ODE Mk2",
-      "long_name":     "Enttec ODE Mk2 Node",
+      "short_name":    "My Art-Net Node",
+      "long_name":     "My Art-Net Node (full name)",
       "mac":           "AA:BB:CC:DD:EE:FF",
       "num_ports":     1,
       "out_universes": [0]
@@ -222,16 +218,16 @@ Emitted after every Art-Net scan.
 
 ### `realityos.lights.state`
 
-Emitted every 10 s and after any fixture list change.
+Emitted periodically and after any fixture list change.
 
 ```json
 {
   "name":      "realityos.lights.state",
-  "node_id":   "dmx-01",
+  "node_id":   "lights-node-name",
   "target_ip": "2.0.0.100",
   "fixtures": [
     {
-      "id":      "par-01",
+      "id":      "fixture-name",
       "type":    "led-par-6ch",
       "address": 1,
       "channels": { "dim": 200, "red": 255, "green": 0, "blue": 0, "white": 0, "strobe": 0 }
@@ -244,7 +240,7 @@ Emitted every 10 s and after any fixture list change.
 
 ## Lights Actions (`lights.*`)
 
-All sent as `node.action` to `dmx-01` (or the configured node ID).
+All sent as `node.action` to the lights actuator node.
 
 | Command | Required `data` fields | Effect |
 |---------|------------------------|--------|
@@ -274,26 +270,26 @@ All sent as `node.action` to `dmx-01` (or the configured node ID).
 
 ## MIDI Namespace (`realityos.midi.*`)
 
-Emitted by the MIDI sensor node from any connected MIDI input device.
+Emitted by a MIDI sensor node from any connected MIDI input device.
 
 ### `realityos.midi.note_on`
 
 ```json
-{ "name": "realityos.midi.note_on", "channel": 1, "note": 60, "velocity": 100, "note_name": "C4", "device": "KeyLab 61" }
+{ "name": "realityos.midi.note_on", "channel": 1, "note": 60, "velocity": 100, "note_name": "C4", "device": "My MIDI Controller" }
 ```
 
 ### `realityos.midi.note_off`
 
 ```json
-{ "name": "realityos.midi.note_off", "channel": 1, "note": 60, "velocity": 0, "note_name": "C4", "device": "KeyLab 61" }
+{ "name": "realityos.midi.note_off", "channel": 1, "note": 60, "velocity": 0, "note_name": "C4", "device": "My MIDI Controller" }
 ```
 
-> Velocity-0 NoteOn messages are normalized to `note_off` by the MIDI node.
+> Velocity-0 NoteOn messages should be normalized to `note_off` by the node.
 
 ### `realityos.midi.control_change`
 
 ```json
-{ "name": "realityos.midi.control_change", "channel": 1, "control": 64, "value": 127, "device": "KeyLab 61" }
+{ "name": "realityos.midi.control_change", "channel": 1, "control": 64, "value": 127, "device": "My MIDI Controller" }
 ```
 
 Common CC numbers: `64` = sustain pedal, `1` = modulation wheel, `7` = volume.
@@ -301,13 +297,13 @@ Common CC numbers: `64` = sustain pedal, `1` = modulation wheel, `7` = volume.
 ### `realityos.midi.program_change`
 
 ```json
-{ "name": "realityos.midi.program_change", "channel": 1, "program": 5, "device": "KeyLab 61" }
+{ "name": "realityos.midi.program_change", "channel": 1, "program": 5, "device": "My MIDI Controller" }
 ```
 
 ### `realityos.midi.pitch_bend`
 
 ```json
-{ "name": "realityos.midi.pitch_bend", "channel": 1, "value": 4096, "device": "KeyLab 61" }
+{ "name": "realityos.midi.pitch_bend", "channel": 1, "value": 4096, "device": "My MIDI Controller" }
 ```
 
 `value` range: -8192 (full down) to 8191 (full up), 0 = center.
@@ -315,7 +311,7 @@ Common CC numbers: `64` = sustain pedal, `1` = modulation wheel, `7` = volume.
 ### `realityos.midi.device_list`
 
 ```json
-{ "name": "realityos.midi.device_list", "devices": [{ "index": 0, "name": "KeyLab 61" }, { "index": 1, "name": "USB MIDI Interface" }] }
+{ "name": "realityos.midi.device_list", "devices": [{ "index": 0, "name": "My MIDI Controller" }, { "index": 1, "name": "My Second MIDI Device" }] }
 ```
 
 Emitted on startup and in response to a `list_devices` node action.
@@ -324,7 +320,7 @@ Emitted on startup and in response to a `list_devices` node action.
 
 | Command | Data | Effect |
 |---------|------|--------|
-| `set_device` | `{ "index": N }` | Hot-swap to MIDI device N without restarting |
+| `set_device` | `{ "index": N }` | Switch to MIDI device N without restarting |
 | `list_devices` | — | Re-emit `realityos.midi.device_list` |
 
 ---
@@ -333,7 +329,7 @@ Emitted on startup and in response to a `list_devices` node action.
 
 ### `realityos.op.stream.level`
 
-Controls how much high-frequency stream data (cursor, body, face) is forwarded to xspace (cloud). Interaction events are always forwarded regardless of this setting.
+Controls how much high-frequency stream data (cursor, body, face) is forwarded to the cloud backend. Interaction events (`presence`, `navigate`, `select`, `gesture`, `hand.*`) are always forwarded regardless.
 
 ```json
 { "name": "realityos.op.stream.level", "level": "medium" }
@@ -347,10 +343,7 @@ Controls how much high-frequency stream data (cursor, body, face) is forwarded t
 | `high` | Every frame | Every frame | Every frame |
 | `smart` | Adaptive (≈ medium) | Adaptive | Adaptive |
 
-**Direction**: App → Player (local). Sent via `uboxclient.js`:
-```js
-ubox.setStreamLevel('high');
-```
+**Direction**: App → Hub (local).
 
 ---
 
@@ -363,38 +356,6 @@ Developer-defined events with free-form JSON body. Name must start with `reality
 { "name": "realityos.custom.zone_trigger",  "zone": "A",   "active": true }
 ```
 
-**Direction**: bidirectional — apps send them to xspace; xspace can send them back.
+**Direction**: bidirectional — apps send them to the cloud backend; the backend can send them back.
 
 No body schema is enforced beyond the name prefix.
-
----
-
-## Kinect v2 → RealityOS Translation Table
-
-The hub translates these legacy event names automatically. Both the original and translated events are delivered to browser apps.
-
-| Kinect name | Canonical event | Fields added |
-|-------------|----------------|--------------|
-| `RIGHT` | `realityos.navigate` | direction=right, hand=right |
-| `LEFT` | `realityos.navigate` | direction=left, hand=right |
-| `LRIGHT` | `realityos.navigate` | direction=right, hand=left |
-| `RLEFT` | `realityos.navigate` | direction=left, hand=left |
-| `GRIP` | `realityos.select` | type=grip |
-| `RELEASE` | `realityos.select` | type=release |
-| `CLICKDOWN` | `realityos.select` | type=push |
-| `CLICKUP` | `realityos.select` | type=pull |
-| `ZOOM_IN` | `realityos.gesture` | type=zoom, direction=in |
-| `ZOOM_OUT` | `realityos.gesture` | type=zoom, direction=out |
-| `POINT` | `realityos.gesture` | type=point, side=right |
-| `Wave` | `realityos.gesture` | type=wave, side=right |
-| `Kick` | `realityos.gesture` | type=kick (angle, side, distance passed through) |
-| `Jump` | `realityos.gesture` | type=jump (intensity passed through) |
-| `Lean` | `realityos.gesture` | type=lean (x, y passed through) |
-| `NewUser` | `realityos.presence` | type=enter |
-| `NoUser` / `UserLeft` | `realityos.presence` | type=leave |
-| `ChangedHandRight` | `realityos.hand.active` | side=right |
-| `ChangedHandLeft` | `realityos.hand.active` | side=left |
-| `ChangedHandNone` | `realityos.hand.active` | side=none |
-| `active_hand` | `realityos.cursor` | x/y normalized from 640×480 to 0–1 |
-| `skeleton` | `realityos.body` | name changed; skeletons passed through |
-| `face` | `realityos.face` | name changed; all fields passed through |
