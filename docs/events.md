@@ -325,6 +325,95 @@ Emitted on startup and in response to a `list_devices` node action.
 
 ---
 
+## SoC Namespace (`realityos.soc.*`)
+
+A bidirectional node bridges a line of simple system-on-chip hardware — buttons, distance sensors, device-local LEDs, etc. — over a device-specific discovery/connect protocol (e.g. UDP broadcast + TCP for ESP32-class devices). `soc` is deliberately hardware-agnostic: it isn't tied to any one chip family, so new device lines can emit into it unchanged.
+
+**Not to be confused with `realityos.lights.*`.** `realityos.soc.led_level`/`realityos.soc.button_led` describe simple GPIO-driven LEDs that live *on the SoC device itself* — never Art-Net/DMX fixtures. These are different hardware with different protocols; an app or node must never bridge one namespace into the other.
+
+Only one device is "connected" at a time per node; discovery and the typed events below are independent of which device (if any) is currently connected.
+
+### `realityos.soc.discovered`
+
+Emitted after every network scan. `device_model` is optional (empty when a device's discovery reply doesn't report one).
+
+```json
+{ "name": "realityos.soc.discovered", "node_id": "soc-node-name", "devices": [{ "ip": "192.168.1.50", "device_id": "BTN01", "port": 8080, "device_type": "ESP32 HD", "device_model": "" }] }
+```
+
+### `realityos.soc.connected` / `realityos.soc.connect_failed` / `realityos.soc.disconnected`
+
+Connection lifecycle for the currently-selected device.
+
+```json
+{ "name": "realityos.soc.connected", "node_id": "soc-node-name", "device_id": "BTN01", "ip": "192.168.1.50", "device_type": "ESP32 HD", "device_model": "" }
+{ "name": "realityos.soc.connect_failed", "node_id": "soc-node-name", "device_id": "BTN01", "error": "auth rejected (wrong secret?)" }
+{ "name": "realityos.soc.disconnected", "node_id": "soc-node-name", "device_id": "BTN01" }
+```
+
+### `realityos.soc.line`
+
+Raw, unparsed passthrough — one event per line the connected device sends. Always emitted regardless of device type; the fallback for any device without a dedicated translation yet.
+
+```json
+{ "name": "realityos.soc.line", "node_id": "soc-node-name", "device_id": "BTN01", "line": "BUTTON_PRESSED" }
+```
+
+### `realityos.soc.distance`
+
+Emitted **in addition to** `realityos.soc.line` when the connected device's type reports a distance reading (e.g. an ultrasonic sensor).
+
+```json
+{ "name": "realityos.soc.distance", "node_id": "soc-node-name", "device_id": "US01", "distance_cm": 42.5 }
+```
+
+### `realityos.soc.led_level`
+
+Emitted **in addition to** `realityos.soc.line` when the connected device's type reports the current lit-LED count on its own LED strip. This is the device's own hardware state, not an Art-Net/DMX fixture.
+
+```json
+{ "name": "realityos.soc.led_level", "node_id": "soc-node-name", "device_id": "TB01", "lit_count": 9 }
+```
+
+### `realityos.soc.buttons_list`
+
+Emitted for button-panel devices, listing every physical button id the device reports. **There is no fixed or expected count** — `buttons` is whatever length the device itself has; nodes and apps must treat it as variable.
+
+```json
+{ "name": "realityos.soc.buttons_list", "node_id": "soc-node-name", "device_id": "BTN01", "buttons": [1, 2, 3, 4, 5, 6, 7, 8] }
+```
+
+### `realityos.soc.button_pressed`
+
+Emitted spontaneously (not a reply to any command) when a physical button is pressed.
+
+```json
+{ "name": "realityos.soc.button_pressed", "node_id": "soc-node-name", "device_id": "BTN01", "button": 3 }
+```
+
+### `realityos.soc.button_led`
+
+Emitted whenever a button's own LED state changes, by command or any other cause the firmware reports. This is the button's own indicator light, not an Art-Net/DMX fixture.
+
+```json
+{ "name": "realityos.soc.button_led", "node_id": "soc-node-name", "device_id": "BTN01", "button": 3, "on": true }
+```
+
+### SoC Node Actions
+
+All sent as `node.action` to the SoC node, same pattern as `lights.*`.
+
+| Command | Data | Effect |
+|---------|------|--------|
+| `esp.scan` | — | Scan for devices on the network, emits `realityos.soc.discovered` |
+| `esp.select` | `ip`, `port`, `device_id`, `device_type`, `device_model` (optional) | Disconnect any current device, connect + handshake to this one |
+| `esp.send` | `cmd: string` | Raw command passthrough to the connected device — contents are device/firmware-specific, not constrained by this protocol |
+| `esp.disconnect` | — | Close the current device connection |
+
+**Direction**: App → Node (`esp.*`), Node → App (`realityos.soc.*`).
+
+---
+
 ## Operational Events (`realityos.op.*`)
 
 ### `realityos.op.stream.level`

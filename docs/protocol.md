@@ -65,7 +65,7 @@ Sent immediately after the WebSocket connection is established.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `node_id` | Yes | Unique identifier for this node instance — set by the user in configuration |
-| `node_type` | Yes | Hardware type string (e.g. `"depth-camera"`, `"lidar"`, `"dmx"`, `"midi"`) |
+| `node_type` | Yes | Hardware type string (e.g. `"depth-camera"`, `"lidar"`, `"dmx"`, `"midi"`, `"esp32"`) |
 | `mode` | Yes | `"detector"` \| `"actuator"` \| `"bidirectional"` |
 | `version` | Yes | Node binary/software version |
 

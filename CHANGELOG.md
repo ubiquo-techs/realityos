@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.2.0 — 2026-10-09
+
+**Added the SoC namespace** (`realityos.soc.*`) — previously implemented by nodes but never formalized in the schema, so every SoC event failed validation (soft/non-blocking, but noisy):
+
+- `realityos.soc.discovered`, `connected`, `connect_failed`, `disconnected`, `line` — device discovery/connection lifecycle and raw line passthrough
+- `realityos.soc.distance` — typed distance reading
+- `realityos.soc.led_level` — typed lit-LED-count reading for a device-local LED strip
+- `realityos.soc.buttons_list` — list of a button-panel device's physical button ids (no fixed/expected count — devices report their own cardinality)
+- `realityos.soc.button_pressed` — spontaneous physical button press
+- `realityos.soc.button_led` — a button's own LED state changed
+- Added `device_model` (optional) to `soc_connected`
+
+**Note**: `realityos.soc.led_level`/`button_led` describe GPIO LEDs living on the SoC device itself — unrelated to `realityos.lights.*` (Art-Net/DMX). Don't conflate the two namespaces.
+
 ## v1.1.0 — 2026-05-21
 
 **Schema bug fixes** — correcting divergences between the schema and the actual runtime behavior of the Ubox Physical Player hub:

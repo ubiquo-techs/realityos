@@ -45,7 +45,7 @@ https://raw.githubusercontent.com/ubiquo-techs/realityos/main/schema/realityos-s
 
 It validates all standard `realityos.*` events using JSON Schema 2020-12. Validation is **soft** — failures are logged but messages are never dropped.
 
-Current version: **1.1.0** (see [CHANGELOG.md](CHANGELOG.md))
+Current version: **1.2.0** (see [CHANGELOG.md](CHANGELOG.md))
 
 ---
 

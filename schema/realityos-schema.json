@@ -3,7 +3,7 @@
   "$id": "https://raw.githubusercontent.com/ubiquo-techs/realityos/main/schema/realityos-schema.json",
   "title": "RealityOS Event Schema",
   "description": "JSON Schema 2020-12 for all standard RealityOS events emitted by ubox nodes.",
-  "x-version": "1.1.0",
+  "x-version": "1.2.0",
   "type": "object",
   "required": ["name"],
   "properties": {
@@ -23,7 +23,17 @@
     { "$ref": "#/$defs/lights_state" },
     { "$ref": "#/$defs/op_stream_level" },
     { "$ref": "#/$defs/midi" },
-    { "$ref": "#/$defs/custom" }
+    { "$ref": "#/$defs/custom" },
+    { "$ref": "#/$defs/soc_discovered" },
+    { "$ref": "#/$defs/soc_connected" },
+    { "$ref": "#/$defs/soc_connect_failed" },
+    { "$ref": "#/$defs/soc_disconnected" },
+    { "$ref": "#/$defs/soc_line" },
+    { "$ref": "#/$defs/soc_distance" },
+    { "$ref": "#/$defs/soc_led_level" },
+    { "$ref": "#/$defs/soc_buttons_list" },
+    { "$ref": "#/$defs/soc_button_pressed" },
+    { "$ref": "#/$defs/soc_button_led" }
   ],
   "$defs": {
     "presence": {
@@ -161,6 +171,117 @@
         }
       },
       "required": ["name"],
+      "additionalProperties": true
+    },
+    "soc_discovered": {
+      "description": "SoC (system-on-chip) device-line hardware discovered on the network (esp.scan). realityos.soc.* is a hardware-agnostic namespace for simple ESP32-class devices — buttons, distance sensors, device-local LEDs — and is unrelated to realityos.lights.* (Art-Net/DMX lighting fixtures); do not conflate the two.",
+      "properties": {
+        "name":    { "const": "realityos.soc.discovered" },
+        "node_id": { "type": "string" },
+        "devices": { "type": "array" }
+      },
+      "required": ["name", "node_id", "devices"],
+      "additionalProperties": true
+    },
+    "soc_connected": {
+      "description": "SoC device connection established (esp.select).",
+      "properties": {
+        "name":        { "const": "realityos.soc.connected" },
+        "node_id":     { "type": "string" },
+        "device_id":   { "type": "string" },
+        "ip":          { "type": "string" },
+        "device_type": { "type": "string" },
+        "device_model": { "type": "string" }
+      },
+      "required": ["name", "node_id", "device_id", "ip", "device_type"],
+      "additionalProperties": true
+    },
+    "soc_connect_failed": {
+      "description": "SoC device connection attempt failed (esp.select).",
+      "properties": {
+        "name":      { "const": "realityos.soc.connect_failed" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" },
+        "error":     { "type": "string" }
+      },
+      "required": ["name", "node_id", "device_id", "error"],
+      "additionalProperties": true
+    },
+    "soc_disconnected": {
+      "description": "SoC device connection closed (esp.disconnect, or the device itself dropped).",
+      "properties": {
+        "name":      { "const": "realityos.soc.disconnected" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" }
+      },
+      "required": ["name", "node_id", "device_id"],
+      "additionalProperties": true
+    },
+    "soc_line": {
+      "description": "Raw, unparsed passthrough — one event per line the connected SoC device sends. Always emitted regardless of device type, alongside any typed event derived from the same line.",
+      "properties": {
+        "name":      { "const": "realityos.soc.line" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" },
+        "line":      { "type": "string" }
+      },
+      "required": ["name", "node_id", "device_id", "line"],
+      "additionalProperties": true
+    },
+    "soc_distance": {
+      "description": "Typed distance reading, derived from a soc_line for devices whose type reports distance (e.g. ULTRASONIC, ESP32 TESTS).",
+      "properties": {
+        "name":        { "const": "realityos.soc.distance" },
+        "node_id":     { "type": "string" },
+        "device_id":   { "type": "string" },
+        "distance_cm": { "type": "number" }
+      },
+      "required": ["name", "node_id", "device_id", "distance_cm"],
+      "additionalProperties": true
+    },
+    "soc_led_level": {
+      "description": "Typed lit-LED-count reading for a device-local LED strip (e.g. ESP32 TESTS). This is SoC hardware state, not an Art-Net/DMX fixture — unrelated to realityos.lights.state.",
+      "properties": {
+        "name":      { "const": "realityos.soc.led_level" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" },
+        "lit_count": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["name", "node_id", "device_id", "lit_count"],
+      "additionalProperties": true
+    },
+    "soc_buttons_list": {
+      "description": "The full list of physical button ids a button-panel device (e.g. ESP32 HD) has, in reply to GET_BUTTONS. The device reports however many buttons it actually has — no fixed/expected count.",
+      "properties": {
+        "name":      { "const": "realityos.soc.buttons_list" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" },
+        "buttons":   { "type": "array", "items": { "type": "integer" } }
+      },
+      "required": ["name", "node_id", "device_id", "buttons"],
+      "additionalProperties": true
+    },
+    "soc_button_pressed": {
+      "description": "A physical button on a button-panel device was pressed. Spontaneous — not a reply to any command.",
+      "properties": {
+        "name":      { "const": "realityos.soc.button_pressed" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" },
+        "button":    { "type": "integer" }
+      },
+      "required": ["name", "node_id", "device_id", "button"],
+      "additionalProperties": true
+    },
+    "soc_button_led": {
+      "description": "A button's own LED state changed (via LED_ON:<n>/LED_OFF:<n>, or any other cause the firmware reports). This is the SoC device's own per-button LED, not an Art-Net/DMX fixture — unrelated to realityos.lights.state.",
+      "properties": {
+        "name":      { "const": "realityos.soc.button_led" },
+        "node_id":   { "type": "string" },
+        "device_id": { "type": "string" },
+        "button":    { "type": "integer" },
+        "on":        { "type": "boolean" }
+      },
+      "required": ["name", "node_id", "device_id", "button", "on"],
       "additionalProperties": true
     }
   }
